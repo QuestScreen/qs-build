@@ -27,13 +27,13 @@ func runAndCheck(cmd *exec.Cmd, errorHandler func(err error, stderr string)) str
 func writeErrorLines(stderr string) {
 	lines := strings.Split(stderr, "\n")
 	for _, line := range lines {
-		os.Stdout.WriteString("[error] … " + line + "\n")
+		logError("… " + line)
 	}
 }
 
 func runAndDumpIfVerbose(cmd *exec.Cmd, errorHandler func(err error, stderr string)) {
 	if opts.Verbose {
-		os.Stdout.WriteString("[verbose] " + cmd.String() + "\n")
+		logVerbose(cmd.String())
 	}
 	stdout := strings.TrimSpace(runAndCheck(cmd, errorHandler))
 	if opts.Verbose && stdout != "" {

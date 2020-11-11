@@ -8,7 +8,7 @@ import (
 )
 
 func discoverPlugins() map[string]string {
-	os.Stdout.WriteString("[info] discovering plugins\n")
+	logInfo("discovering plugins")
 	plugindirs, err := ioutil.ReadDir(".")
 	if err != nil {
 		panic(err)
@@ -21,19 +21,19 @@ func discoverPlugins() map[string]string {
 		path := filepath.Join(plugindir.Name(), "questscreen-plugin.txt")
 		info, err := os.Stat(path)
 		if err != nil {
-			os.Stdout.WriteString("[warning] " + path + ": " + err.Error() + "\n")
-			os.Stdout.WriteString("[warning] " + plugindir.Name() + ": skipping\n")
+			logWarning(path + ": " + err.Error())
+			logWarning(plugindir.Name() + ": skipping")
 			continue
 		}
 		if info.IsDir() {
-			os.Stdout.WriteString("[warning] " + path + ": is a directory\n")
-			os.Stdout.WriteString("[warning] " + plugindir.Name() + ": skipping\n")
+			logWarning(path + ": is a directory")
+			logWarning(plugindir.Name() + ": skipping")
 			continue
 		}
 		varName, err := ioutil.ReadFile(path)
 		if err != nil {
-			os.Stdout.WriteString("[warning] " + path + ": " + err.Error() + "\n")
-			os.Stdout.WriteString("[warning] " + plugindir.Name() + ": skipping\n")
+			logWarning(path + ": " + err.Error())
+			logWarning(plugindir.Name() + ": skipping")
 			continue
 		}
 		plugins[plugindir.Name()] = string(varName)
@@ -42,7 +42,7 @@ func discoverPlugins() map[string]string {
 }
 
 func writePluginCollector(plugins map[string]string) {
-	os.Stdout.WriteString("[info] generating plugins/plugins.go\n")
+	logInfo("generating plugins/plugins.go")
 	var loader strings.Builder
 	loader.WriteString("package plugins\n\nimport(\n")
 	loader.WriteString("\t\"github.com/QuestScreen/QuestScreen/app\"\n")
@@ -58,7 +58,7 @@ func writePluginCollector(plugins map[string]string) {
 }
 
 func writeWebPluginLoader(plugins map[string]string) {
-	os.Stdout.WriteString("[info] generating web/main/plugins.go\n")
+	logInfo("generating web/main/plugins.go")
 	var loader strings.Builder
 	loader.WriteString("package main\n\nimport(\n")
 	for dir := range plugins {

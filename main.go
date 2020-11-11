@@ -82,15 +82,15 @@ func main() {
 
 	local := isInLocalQuestScreenRepo()
 	if local {
-		os.Stdout.WriteString("[init] using cwd as QuestScreen source directory\n")
+		logInfo("using cwd as QuestScreen source directory")
 	} else {
-		os.Stdout.WriteString("[init] not in QuestScreen source root; downloading it\n")
+		logInfo("not in QuestScreen source root; downloading it")
 		panic("out-of-source build not implemented")
 	}
 
 	for i := range commands {
 		if commandEnabled[i] {
-			os.Stdout.WriteString("[phase] " + commands[i].name + "\n")
+			logPhase(commands[i].name)
 			commands[i].exec()
 		}
 	}
