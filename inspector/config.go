@@ -5,6 +5,8 @@ import (
 	"os"
 	"reflect"
 	"text/template"
+
+	"github.com/QuestScreen/api/config"
 )
 
 type configField struct {
@@ -26,7 +28,7 @@ import (
 	"github.com/QuestScreen/api/web/config"
 	"encoding/json"
 	{{- range .Imports}}
-	{{.Name}} "{{.Path}}"
+	{{.Name}} "{{.Path}}/web"
 	{{- end}}
 )
 
@@ -44,10 +46,10 @@ func LoadConfig(ctx server.Context, input []byte) (map[string]config.Controller,
 			return nil, errors.New("field missing: " + "{{.Label}}")
 		}
 		var value {{.ControllerName}}
-		if err := json.Unmarshal(raw, value); err != nil {
+		if err := json.Unmarshal(raw, &value); err != nil {
 			return nil, errors.New("in config item {{.Label}}: " + err.Error())
 		}
-		ret["{{.Label}}"] = value
+		ret["{{.Label}}"] = &value
 		delete(items, "{{.Label}}")
 	}
 	{{- end}}
@@ -74,10 +76,28 @@ func InspectConfig(modName string, confValue interface{}) error {
 	var data configData
 	for i := 0; i < rType.NumField(); i++ {
 		field := rType.Field(i)
-		importD := importData{Name: fmt.Sprintf("p%v", len(data.Imports)+1),
-			Path: rType.PkgPath()}
+		fVal := rValue.Field(i)
+		fType := field.Type
+		if fType.Kind() != reflect.Ptr {
+			return fmt.Errorf("module %v: config field %v does not have pointer type", modName, field.Name)
+		}
+		fType = fType.Elem()
+		if _, ok := fVal.Interface().(config.Item); !ok {
+			return fmt.Errorf("module %v: config field %v is not a config.Item", modName, field.Name)
+		}
+		var importD importData
+		for _, item := range data.Imports {
+			if item.Path == fType.PkgPath() {
+				importD = item
+				break
+			}
+		}
+		if importD.Name == "" {
+			importD = importData{Name: fmt.Sprintf("p%v", len(data.Imports)+1),
+				Path: fType.PkgPath()}
+			data.Imports = append(data.Imports, importD)
+		}
 		item := configField{Label: field.Name, ControllerName: importD.Name + ".Controller"}
-		data.Imports = append(data.Imports, importD)
 		data.Items = append(data.Items, item)
 	}
 	if err := tmpl.Execute(os.Stdout, data); err != nil {
