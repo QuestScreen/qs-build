@@ -9,6 +9,7 @@ import (
 
 var opts struct {
 	Verbose bool `short:"v" long:"verbose" description:"Show verbose debug information"`
+	Debug   bool `short:"d" long:"debug" description:"Build an executable for debugging (includes JS source map and Go sources)"`
 }
 
 func runAndCheck(cmd *exec.Cmd, errorHandler func(err error, stderr string)) string {

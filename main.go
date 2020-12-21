@@ -90,7 +90,7 @@ func main() {
 
 	if _, err := os.Stat("assets"); err != nil {
 		if os.IsNotExist(err) {
-			os.Mkdir("assets", os.ModeDir)
+			os.Mkdir("assets", 0755)
 		} else {
 			logError("unable to create directory 'assets':")
 			logError(err.Error())
