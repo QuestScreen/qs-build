@@ -33,4 +33,5 @@ func buildWebUI() {
 
 	os.Chdir("../..")
 	os.Rename("web/main/main.js", "assets/main.js")
+	os.Rename("web/main/main.js.map", "assets/main.js.map")
 }

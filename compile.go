@@ -7,7 +7,7 @@ import (
 
 func compileQuestscreen() {
 	os.Chdir("main")
-	runAndDumpIfVerbose(exec.Command("go", "build"),
+	runAndDumpIfVerbose(exec.Command("go", "build", "-o", "../questscreen"),
 		func(err error, stderr string) {
 			logError("failed to compile QuestScreen:")
 			logError(err.Error())

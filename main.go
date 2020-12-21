@@ -88,6 +88,15 @@ func main() {
 		panic("out-of-source build not implemented")
 	}
 
+	if _, err := os.Stat("assets"); err != nil {
+		if os.IsNotExist(err) {
+			os.Mkdir("assets", os.ModeDir)
+		} else {
+			logError("unable to create directory 'assets':")
+			logError(err.Error())
+			os.Exit(1)
+		}
+	}
 	for i := range commands {
 		if commandEnabled[i] {
 			logPhase(commands[i].name)
