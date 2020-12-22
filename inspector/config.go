@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"text/template"
 
 	"github.com/QuestScreen/api/config"
@@ -28,7 +29,7 @@ import (
 	"github.com/QuestScreen/api/web/config"
 	"encoding/json"
 	{{- range .Imports}}
-	{{.Name}} "{{.Path}}/web"
+	{{.Name}} "{{.Path}}"
 	{{- end}}
 )
 
@@ -85,16 +86,20 @@ func InspectConfig(modName string, confValue interface{}) error {
 		if _, ok := fVal.Interface().(config.Item); !ok {
 			return fmt.Errorf("module %v: config field %v is not a config.Item", modName, field.Name)
 		}
+		pkgPathElms := strings.Split(fType.PkgPath(), "/")
+		webPath := strings.Join(append(pkgPathElms[:len(pkgPathElms)-1], "web",
+			pkgPathElms[len(pkgPathElms)-1]), "/")
+
 		var importD importData
 		for _, item := range data.Imports {
-			if item.Path == fType.PkgPath() {
+			if item.Path == webPath {
 				importD = item
 				break
 			}
 		}
 		if importD.Name == "" {
 			importD = importData{Name: fmt.Sprintf("p%v", len(data.Imports)+1),
-				Path: fType.PkgPath()}
+				Path: webPath}
 			data.Imports = append(data.Imports, importD)
 		}
 		item := configField{Label: field.Name, ControllerName: importD.Name + ".Controller"}

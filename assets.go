@@ -29,7 +29,6 @@ func packAssets() {
 		for _, file := range files {
 			if file.Name() != "main.js" && file.Name() != "main.js.map" &&
 				file.Name() != "index.html" {
-				logInfo("removing " + filepath.Join("assets", file.Name()))
 				if err = os.RemoveAll(filepath.Join("assets", file.Name())); err != nil {
 					logError("failed to remove assets/" + file.Name() + ":")
 					logError(err.Error())
