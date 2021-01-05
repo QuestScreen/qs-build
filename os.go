@@ -20,6 +20,11 @@ func runAndCheck(cmd *exec.Cmd, errorHandler func(err error, stderr string)) str
 
 	if err := cmd.Run(); err != nil {
 		errorHandler(err, stderr.String())
+		output := strings.TrimSpace(stdout.String())
+		if len(output) > 0 {
+			logError("output:")
+			os.Stdout.WriteString(stdout.String())
+		}
 		os.Exit(1)
 	}
 	return stdout.String()
@@ -27,6 +32,9 @@ func runAndCheck(cmd *exec.Cmd, errorHandler func(err error, stderr string)) str
 
 func writeErrorLines(stderr string) {
 	lines := strings.Split(stderr, "\n")
+	for len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
+		lines = lines[:len(lines)-1]
+	}
 	for _, line := range lines {
 		logError("… " + line)
 	}

@@ -7,13 +7,16 @@ import (
 )
 
 func buildWebUI() {
-	runAndDumpIfVerbose(exec.Command("askew", "-o", "assets", "."),
+	logInfo("running askew")
+	runAndDumpIfVerbose(exec.Command("askew", "-o", "assets", "--exclude",
+		"app,assets,build-doc,data,display,main,shared", "."),
 		func(err error, stderr string) {
 			logError("failed to run askew:")
 			logError(err.Error())
 			writeErrorLines(stderr)
 		})
 
+	logInfo("compiling code to JavaScript")
 	gopherjsRoot := runAndCheck(exec.Command("go1.12.16", "env", "GOROOT"),
 		func(err error, stderr string) {
 			logError("failed to query go1.12.16 for GOROOT:")
