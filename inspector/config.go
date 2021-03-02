@@ -11,7 +11,7 @@ import (
 )
 
 type configField struct {
-	Label, ControllerName string
+	Label, ConstructorName string
 }
 
 type importData struct {
@@ -25,7 +25,7 @@ type configData struct {
 
 var tmpl = template.Must(template.New("configLoader").Parse(`
 import (
-	"github.com/QuestScreen/api/web/server"
+	"github.com/QuestScreen/api/web/modules"
 	"github.com/QuestScreen/api/web/config"
 	"encoding/json"
 	{{- range .Imports}}
@@ -33,31 +33,13 @@ import (
 	{{- end}}
 )
 
-// LoadConfig loads configuration values of this module.
-func LoadConfig(ctx server.Context, input []byte) (map[string]config.Controller, error) {
-	var items map[string]json.RawMessage
-	if err := json.Unmarshal(input, items); err != nil {
-		return nil, err
-	}
-	ret := make(map[string]config.Controller)
+var ConfigDescriptor = []modules.ConfigItem{
 	{{- range .Items}}
 	{
-		raw, ok := items["{{.Label}}"]
-		if !ok {
-			return nil, errors.New("field missing: " + "{{.Label}}")
-		}
-		var value {{.ControllerName}}
-		if err := json.Unmarshal(raw, &value); err != nil {
-			return nil, errors.New("in config item {{.Label}}: " + err.Error())
-		}
-		ret["{{.Label}}"] = &value
-		delete(items, "{{.Label}}")
-	}
+		Constructor: {{.ConstructorName}},
+		Name: "{{.Label}}",
+	},
 	{{- end}}
-	for key := range items {
-		return nil, errors.New("unknown field: " + key)
-	}
-	return ret, nil
 }
 `))
 
@@ -102,7 +84,7 @@ func InspectConfig(modName string, confValue interface{}) error {
 				Path: webPath}
 			data.Imports = append(data.Imports, importD)
 		}
-		item := configField{Label: field.Name, ControllerName: importD.Name + ".Controller"}
+		item := configField{Label: field.Name, ConstructorName: importD.Name + ".New" + fType.Name()}
 		data.Items = append(data.Items, item)
 	}
 	if err := tmpl.Execute(os.Stdout, data); err != nil {
