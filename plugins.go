@@ -421,7 +421,12 @@ func executeInspector(pluginName, moduleName string) {
 	cwd, _ := os.Getwd()
 	os.Chdir(dir)
 	defer os.Chdir(cwd)
-	runAndDumpIfVerbose(exec.Command("go", "build", "-o", "main"),
+
+	buildCmd := exec.Command("go", "build", "-o", "main")
+	buildCmd.Env = os.Environ()
+	buildCmd.Env = append(buildCmd.Env, "GO111MODULE=off")
+
+	runAndDumpIfVerbose(buildCmd,
 		func(err error, stderr string) {
 			logError(fmt.Sprintf("plugins/%v/%v [tmpdir: %v]:", pluginName, moduleName, dir))
 			logError("failed to build inspector for module configuration:")
