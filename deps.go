@@ -31,6 +31,7 @@ func installGo11216() {
 }
 
 func ensureDepsAvailable() {
+	ensureAvailable("golang.org/x/tools/cmd/goimports")
 	ensureAvailable("github.com/go-bindata/go-bindata/...")
 	ensureAvailable("github.com/flyx/askew")
 	ensureAvailable("github.com/gopherjs/gopherjs")
