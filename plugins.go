@@ -474,11 +474,7 @@ func executeInspector(pluginImportPath, moduleName, moduleID string,
 	os.Chdir(dirPath)
 	defer os.Chdir(cwd)
 
-	buildCmd := exec.Command("go", "build", "-o", "main")
-	buildCmd.Env = os.Environ()
-	buildCmd.Env = append(buildCmd.Env, "GO111MODULE=off")
-
-	runAndDumpIfVerbose(buildCmd,
+	runAndDumpIfVerbose(exec.Command("go", "build", "-o", "main"),
 		func(err error, stderr string) {
 			logError(fmt.Sprintf("%v/%v [tmpdir: %v]:",
 				pluginImportPath, moduleName, dirPath))
