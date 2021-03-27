@@ -68,17 +68,17 @@ func main() {
 	}
 
 	commands := []command{
-		command{cmd: "deps", name: "Dependencies",
+		{cmd: "deps", name: "Dependencies",
 			description: "Ensures that all dependencies required for building QuestScreen are available",
 			exec:        ensureDepsAvailable},
-		command{cmd: "plugins", name: "Plugins",
+		{cmd: "plugins", name: "Plugins",
 			description: "walks the plugins directory and discovers all plugins there. Writes code for loading the plugins in web UI and main app",
 			exec:        writePluginLoaders},
-		command{cmd: "webui", name: "Web UI", description: "compiles web UI to assets/main.js",
+		{cmd: "webui", name: "Web UI", description: "compiles web UI to assets/main.js",
 			exec: buildWebUI},
-		command{cmd: "assets", name: "Assets", description: "packages all web files in assets/ into assets/assets.go",
+		{cmd: "assets", name: "Assets", description: "packages all web files in assets/ into assets/assets.go",
 			exec: packAssets},
-		command{cmd: "compile", name: "Compile", description: "compiles main app", exec: compileQuestscreen},
+		{cmd: "compile", name: "Compile", description: "compiles main app", exec: compileQuestscreen},
 	}
 
 	doInstall := false

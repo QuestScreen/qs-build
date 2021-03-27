@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
@@ -26,7 +27,11 @@ func buildWebUI() {
 
 	os.Chdir("web/main")
 	cmd := exec.Command("gopherjs", "build")
-	cmd.Env = append(os.Environ(), "GOPHERJS_GOROOT="+strings.TrimSpace(gopherjsRoot))
+	if runtime.GOOS == "windows" {
+		cmd.Env = append(os.Environ(), "GOPHERJS_GOROOT="+strings.TrimSpace(gopherjsRoot), "GOOS=linux")
+	} else {
+		cmd.Env = append(os.Environ(), "GOPHERJS_GOROOT="+strings.TrimSpace(gopherjsRoot))
+	}
 	runAndDumpIfVerbose(cmd,
 		func(err error, stderr string) {
 			logError("failed to compile web UI:")
