@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
-	"github.com/jessevdk/go-flags"
+	flags "github.com/jessevdk/go-flags"
 	"golang.org/x/mod/modfile"
 )
 
@@ -36,10 +39,22 @@ func isInLocalQuestScreenRepo() bool {
 	return mod.Module.Mod.Path == "github.com/QuestScreen/QuestScreen"
 }
 
+var goPathSrc string
+
 func main() {
 	args, err := flags.Parse(&opts)
 	if err != nil {
 		panic(err)
+	}
+
+	{
+		cmd := exec.Command("go", "env", "GOPATH")
+		gopath := runAndCheck(cmd, func(err error, stderr string) {
+			logError("failed to get GOPATH:")
+			logError(err.Error())
+			writeErrorLines(stderr)
+		})
+		goPathSrc = strings.SplitN(gopath, string(os.PathListSeparator), 2)[0] + "src"
 	}
 
 	commands := []command{
@@ -56,6 +71,7 @@ func main() {
 		command{cmd: "compile", name: "Compile", description: "compiles main app", exec: compileQuestscreen},
 	}
 
+	doInstall := false
 	commandEnabled := make([]bool, len(commands))
 	if len(args) == 0 {
 		for i := range commandEnabled {
@@ -64,6 +80,16 @@ func main() {
 	} else {
 		for i := range args {
 			found := false
+			if args[i] == "install" {
+				if len(args) != 1 {
+					panic("cannot give `install` along with other commands")
+				}
+				for j := range commands {
+					commandEnabled[j] = true
+				}
+				doInstall = true
+				break
+			}
 			for j := range commands {
 				if commands[j].cmd == args[i] {
 					found = true
@@ -84,8 +110,23 @@ func main() {
 	if local {
 		logInfo("using cwd as QuestScreen source directory")
 	} else {
-		logInfo("not in QuestScreen source root; downloading it")
-		panic("out-of-source build not implemented")
+		if !doInstall {
+			panic("error: you are not within a QuestScreen source directory.")
+		}
+		logInfo("not in QuestScreen source directory; downloading it")
+		cmd := exec.Command("go", "get", "-d", "-u", "github.com/QuestScreen/QuestScreen")
+		runAndDumpIfVerbose(cmd, func(err error, stderr string) {
+			logError("failed to get github.com/QuestScreen/QuestScreen:")
+			logError(err.Error())
+			writeErrorLines(stderr)
+		})
+		os.Chdir(filepath.Join(goPathSrc, "github.com", "QuestScreen", "QuestScreen"))
+	}
+
+	if opts.PluginFile != "" {
+		if opts.PluginFile, err = filepath.Abs(opts.PluginFile); err != nil {
+			panic(err)
+		}
 	}
 
 	if _, err := os.Stat("assets"); err != nil {

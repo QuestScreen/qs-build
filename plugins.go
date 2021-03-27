@@ -47,9 +47,9 @@ type pluginTemplates struct {
 
 // PluginDescr loads the content of a questscreen-plugin.yaml file.
 type PluginDescr struct {
-	Name      string
-	Modules   []string
-	Templates pluginTemplates
+	Name, importPath string
+	Modules          []string
+	Templates        pluginTemplates
 }
 
 type sceneTmplData struct {
@@ -68,15 +68,39 @@ type pluginTemplateData struct {
 	Systems []systemTmplData
 }
 
+type moduleData struct {
+	ImportName, Name string
+}
+
 type pluginData struct {
-	ID, Name  string
-	Modules   []string
-	Templates pluginTemplateData
+	ImportPath, ID, Name string
+	Modules              []moduleData
+	Templates            pluginTemplateData
 }
 
 // Data holds the processed metadata for plugins.
 // All maps are transformed into slices for reproducible indexing.
 type Data []pluginData
+
+func discoverPlugin(importPath, path string) (PluginDescr, error) {
+	yamlPath := filepath.Join(path, "questscreen-plugin.yaml")
+	info, err := os.Stat(yamlPath)
+	if err != nil {
+		return PluginDescr{}, errors.New(importPath + ": " + err.Error())
+	}
+	if info.IsDir() {
+		return PluginDescr{}, errors.New(importPath + ": is a directory")
+	}
+	description, err := ioutil.ReadFile(yamlPath)
+	if err != nil {
+		return PluginDescr{}, errors.New(importPath + ": " + err.Error())
+	}
+	var p PluginDescr
+	if err = yaml.Unmarshal(description, &p); err != nil {
+		return PluginDescr{}, errors.New(path + ": error while loading YAML: " + err.Error())
+	}
+	return p, nil
+}
 
 func discoverPlugins() map[string]PluginDescr {
 	logInfo("discovering plugins")
@@ -89,44 +113,84 @@ func discoverPlugins() map[string]PluginDescr {
 		if !plugindir.IsDir() {
 			continue
 		}
-		path := filepath.Join(plugindir.Name(), "questscreen-plugin.yaml")
-		info, err := os.Stat(path)
+		p, err := discoverPlugin(plugindir.Name(), plugindir.Name())
 		if err != nil {
-			logWarning(path + ": " + err.Error())
+			logWarning(err.Error())
 			logWarning(plugindir.Name() + ": skipping")
-			continue
+		} else {
+			p.importPath = "github.com/QuestScreen/QuestScreen/plugins/" + plugindir.Name()
+			if _, ok := plugins[plugindir.Name()]; ok {
+				panic("duplicate plugin id: " + plugindir.Name())
+			}
+			plugins[plugindir.Name()] = p
 		}
-		if info.IsDir() {
-			logWarning(path + ": is a directory")
-			logWarning(plugindir.Name() + ": skipping")
-			continue
-		}
-		description, err := ioutil.ReadFile(path)
-		if err != nil {
-			logWarning(path + ": " + err.Error())
-			logWarning(plugindir.Name() + ": skipping")
-			continue
-		}
-		var p PluginDescr
-		if err = yaml.Unmarshal(description, &p); err != nil {
-			logWarning(path + ": error while loading YAML: " + err.Error())
-			logWarning(plugindir.Name() + ": skipping")
-			continue
-		}
-		plugins[plugindir.Name()] = p
 	}
+	if opts.PluginFile == "" {
+		info, err := os.Stat("plugins.txt")
+		if err != nil || info.IsDir() {
+			return plugins
+		}
+		opts.PluginFile = "plugins.txt"
+	}
+	pFile, err := os.Open(opts.PluginFile)
+	if err != nil {
+		panic(err)
+	}
+	defer pFile.Close()
+	reader := bufio.NewReader(pFile)
+	var line string
+	lineCount := 0
+	for {
+		line, err = reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			break
+		}
+		lineCount++
+		line = strings.TrimSpace(line)
+		items := strings.Split(line, " ")
+		var id, importPath string
+		switch len(items) {
+		case 0:
+			continue
+		case 1:
+			importPath = items[0]
+			id = filepath.Base(importPath)
+		case 2:
+			importPath = items[1]
+			id = items[0]
+		default:
+			panic(fmt.Sprintf("%s(%v): too many items in line", opts.PluginFile, lineCount))
+		}
+		p, err := discoverPlugin(importPath, filepath.Join(goPathSrc, importPath))
+		if err != nil {
+			logWarning(err.Error())
+			logWarning(importPath + ": skipping")
+		} else {
+			p.importPath = importPath
+			if _, ok := plugins[id]; ok {
+				panic(fmt.Sprintf("%s(%v): duplicate plugin ID `%v`", opts.PluginFile, lineCount, id))
+			}
+			plugins[id] = p
+		}
+	}
+
 	return plugins
 }
 
 func process(input map[string]PluginDescr) Data {
 	ret := make(Data, 0, len(input))
+	modCount := 0
 	for id, value := range input {
-		plugin := pluginData{ID: id, Name: value.Name, Modules: value.Modules,
-			Templates: pluginTemplateData{
+		plugin := pluginData{ImportPath: value.importPath, ID: id, Name: value.Name,
+			Modules: make([]moduleData, len(value.Modules)), Templates: pluginTemplateData{
 				Groups:  value.Templates.Groups,
 				Scenes:  make([]sceneTmplData, 0, len(value.Templates.Scenes)),
 				Systems: make([]systemTmplData, 0, len(value.Templates.Systems)),
 			}}
+		for i, m := range value.Modules {
+			plugin.Modules[i] = moduleData{ImportName: fmt.Sprintf("qmod%v", modCount), Name: m}
+			modCount++
+		}
 		for id, s := range value.Templates.Scenes {
 			plugin.Templates.Scenes = append(plugin.Templates.Scenes,
 				sceneTmplData{
@@ -182,9 +246,9 @@ import (
 	"github.com/QuestScreen/api/modules"
 	"github.com/QuestScreen/QuestScreen/app"
 	{{- range $value := .}}
-	"github.com/QuestScreen/QuestScreen/plugins/{{$value.ID}}"
+	{{$value.ID}} "{{$value.ImportPath}}"
 	{{- range $value.Modules}}
-	"github.com/QuestScreen/QuestScreen/plugins/{{$value.ID}}/{{.}}"
+	{{.ImportName}} "{{$value.ImportPath}}/{{.Name}}"
 	{{- end}}
 	{{- end}}
 )
@@ -195,7 +259,7 @@ func LoadPlugins(a app.App) {
 		Name: "{{js .Name}}",
 		Modules: []*modules.Module{
 			{{- range .Modules}}
-			&{{.}}.Descriptor,
+			&{{.ImportName}}.Descriptor,
 			{{- end}}
 		},
 		SystemTemplates: []app.SystemTemplate{
@@ -239,7 +303,7 @@ func LoadPlugins(a app.App) {
 }
 `))
 
-func ensureFileDoesntExistOrIsAutogenerated(path string) {
+func ensureFileDoesntExistOrIsAutogenerated(path string) string {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		logError("unable to transform path to absolute path:")
@@ -251,7 +315,7 @@ func ensureFileDoesntExistOrIsAutogenerated(path string) {
 	data, err := os.Stat(abs)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return
+			return abs
 		}
 		logError("unable to stat file:")
 		logError(err.Error())
@@ -288,49 +352,14 @@ func ensureFileDoesntExistOrIsAutogenerated(path string) {
 		logError("… refusing to overwrite file that was not generated by qs-build. delete manually.")
 		os.Exit(1)
 	}
+	return abs
 }
 
 func writePluginCollector(plugins Data) {
-	ensureFileDoesntExistOrIsAutogenerated("plugins.go")
+	path := ensureFileDoesntExistOrIsAutogenerated("plugins.go")
 	var writer strings.Builder
 	pluginsGoTmpl.Execute(&writer, plugins)
-	writeFormatted(writer.String(), "plugins.go")
-}
-
-var webPluginLoaderTmpl = template.Must(template.New("webPluginLoader").Parse(
-	`
-package web
-
-// Code generated by qs-build. DO NOT EDIT.
-
-{{$pluginName := .Name}}
-import (
-	{{- range .Modules}}
-	{{.}} "github.com/QuestScreen/QuestScreen/plugins/{{$pluginName}}/web/{{.}}"
-	{{- end}}
-	"github.com/QuestScreen/QuestScreen/web"
-)
-
-func RegisterModules(reg web.PluginRegistrator) error {
-	{{- range .Modules}}
-	if err := reg.RegisterModule("{{.}}", {{.}}.NewState, {{.}}.ConfigDescriptor);
-		err != nil {
-		return err
-	}
-	{{- end}}
-	return nil
-}
-`))
-
-func writeModuleLoader(pluginName string, modules []string) {
-	ensureFileDoesntExistOrIsAutogenerated("web/init.go")
-	var writer strings.Builder
-	data := struct {
-		Name    string
-		Modules []string
-	}{Name: pluginName, Modules: modules}
-	webPluginLoaderTmpl.Execute(&writer, data)
-	writeFormatted(writer.String(), "web/init.go")
+	writeFormatted(writer.String(), path)
 }
 
 var webPluginsLoaderTmpl = template.Must(template.New("webPluginsLoader").Funcs(
@@ -344,8 +373,11 @@ var webPluginsLoaderTmpl = template.Must(template.New("webPluginsLoader").Funcs(
 // Code generated by qs-build. DO NOT EDIT.
 
 import (
-	{{- range .}}
-	{{.ID}} "github.com/QuestScreen/QuestScreen/plugins/{{.ID}}/web"
+	"github.com/QuestScreen/QuestScreen/web"
+	{{- range $p := .}}
+	{{- range $p.Modules}}
+	{{.ImportName}} "{{$p.ImportPath}}/web/{{.Name}}"
+	{{- end}}
 	{{- end}}
 )
 
@@ -353,23 +385,26 @@ func registerPlugins(loader *pluginLoader) error {
 	{{- range $index, $value := .}}
 	loader.id = "{{$value.ID}}"
 	loader.index = {{$index}}
-  if err := {{$value.ID}}.RegisterModules(loader); err != nil {
+	{{- range $value.Modules}}
+	if err := loader.RegisterModule("{{.Name}}", {{.ImportName}}.NewState, web.ConfigDescriptor{{.ImportName}});
+		err != nil {
 		return err
 	}
+	{{- end}}
 	{{- end}}
 	return nil
 }
 `))
 
 func writeWebPluginLoader(plugins Data) {
-	ensureFileDoesntExistOrIsAutogenerated("web/main/plugins.go")
+	path := ensureFileDoesntExistOrIsAutogenerated("web/main/plugins.go")
 	var loader strings.Builder
 	if err := webPluginsLoaderTmpl.Execute(&loader, plugins); err != nil {
 		logError("failed to render plugins.go:")
 		logError(err.Error())
 		os.Exit(1)
 	}
-	writeFormatted(loader.String(), "web/main/plugins.go")
+	writeFormatted(loader.String(), path)
 }
 
 var configLoaderGeneratorTmpl = template.Must(template.New("configLoaderGenerator").Parse(
@@ -383,7 +418,7 @@ import (
 )
 
 func main() {
-	err := inspector.InspectConfig("{{.ModuleName}}", {{.ModuleName}}.Descriptor.DefaultConfig)
+	err := inspector.InspectConfig("{{.ModuleName}}", "{{.ModuleID}}", {{.ModuleName}}.Descriptor.DefaultConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -391,9 +426,9 @@ func main() {
 
 `))
 
-func executeInspector(pluginName, moduleName string) {
-	ensureFileDoesntExistOrIsAutogenerated(
-		filepath.Join(pluginName, moduleName, "web", "configloader.go"))
+func executeInspector(pluginImportPath, moduleName, moduleID string) {
+	targetPath := ensureFileDoesntExistOrIsAutogenerated(
+		filepath.Join("web", "configitems"+moduleID+".go"))
 
 	dir, err := ioutil.TempDir("", "qs-build")
 	if err != nil {
@@ -409,9 +444,9 @@ func executeInspector(pluginName, moduleName string) {
 		os.Exit(1)
 	}
 	if err = configLoaderGeneratorTmpl.Execute(inspectorExe, struct {
-		Import, ModuleName string
-	}{fmt.Sprintf("github.com/QuestScreen/QuestScreen/plugins/%v/%v",
-		pluginName, moduleName), moduleName}); err != nil {
+		Import, ModuleName, ModuleID string
+	}{fmt.Sprintf("%v/%v",
+		pluginImportPath, moduleName), moduleName, moduleID}); err != nil {
 		inspectorExe.Close()
 		logError("failed to generate content for config loader generator:")
 		logError(err.Error())
@@ -428,7 +463,7 @@ func executeInspector(pluginName, moduleName string) {
 
 	runAndDumpIfVerbose(buildCmd,
 		func(err error, stderr string) {
-			logError(fmt.Sprintf("plugins/%v/%v [tmpdir: %v]:", pluginName, moduleName, dir))
+			logError(fmt.Sprintf("%v/%v [tmpdir: %v]:", pluginImportPath, moduleName, dir))
 			logError("failed to build inspector for module configuration:")
 			logError(err.Error())
 			writeErrorLines(stderr)
@@ -439,40 +474,21 @@ func executeInspector(pluginName, moduleName string) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err = cmd.Run(); err != nil {
-		logError(fmt.Sprintf("plugins/%v/%v [tmpdir: %v]:", pluginName, moduleName, dir))
+		logError(fmt.Sprintf("%v/%v [tmpdir: %v]:", pluginImportPath, moduleName, dir))
 		logError("failed to execute inspector for module configuration:")
 		logError(err.Error())
 		writeErrorLines(stderr.String())
 		os.Exit(1)
 	}
 
-	webDir := filepath.Join(cwd, pluginName, "web", moduleName)
-	if err = os.Chdir(webDir); err != nil {
-		logError(fmt.Sprintf("%v: unable to enter directory, missing?", webDir))
-		os.Exit(1)
-	}
-	var loader strings.Builder
-	loader.WriteString("package ")
-	loader.WriteString(moduleName)
-	loader.WriteString("\n\n// Code generated by qs-build. DO NOT EDIT.\n\n")
-	loader.Write(stdout.Bytes())
-
-	writeFormatted(loader.String(), "configitems.go")
+	writeFormatted(stdout.String(), targetPath)
 }
 
 func writeModuleConfigLoaders(plugins Data) {
 	for _, plugin := range plugins {
 		for _, module := range plugin.Modules {
-			executeInspector(plugin.ID, module)
+			executeInspector(plugin.ImportPath, module.Name, module.ImportName)
 		}
-	}
-}
-
-func writeModuleWebLoaders(plugins Data) {
-	for _, plugin := range plugins {
-		os.Chdir(plugin.ID)
-		writeModuleLoader(plugin.ID, plugin.Modules)
-		os.Chdir("..")
 	}
 }
 
@@ -487,9 +503,7 @@ func writePluginLoaders() {
 	}
 
 	writePluginCollector(plugins)
-	writeModuleConfigLoaders(plugins)
-	writeModuleWebLoaders(plugins)
-
 	os.Chdir("..")
+	writeModuleConfigLoaders(plugins)
 	writeWebPluginLoader(plugins)
 }

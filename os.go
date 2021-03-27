@@ -8,8 +8,9 @@ import (
 )
 
 var opts struct {
-	Verbose bool `short:"v" long:"verbose" description:"Show verbose debug information"`
-	Debug   bool `short:"d" long:"debug" description:"Build an executable for debugging (includes JS source map and Go sources)"`
+	Verbose    bool   `short:"v" long:"verbose" description:"Show verbose debug information"`
+	Debug      bool   `short:"d" long:"debug" description:"Build an executable for debugging (includes JS source map and Go sources)"`
+	PluginFile string `shord:"p" long:"pluginFile" description:"Path to a file that contains the import paths of all plugins you want to use" optional:"true"`
 }
 
 func runAndCheck(cmd *exec.Cmd, errorHandler func(err error, stderr string)) string {
