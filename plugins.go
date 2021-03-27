@@ -485,7 +485,13 @@ func executeInspector(pluginImportPath, moduleName, moduleID string,
 		})
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := exec.Command(filepath.Join(dirPath, "main"))
+	var mainPath string
+	if runtime.GOOS == "windows" {
+		mainPath = filepath.Join(dirPath, "main.exe")
+	} else {
+		mainPath = filepath.Join(dirPath, "main")
+	}
+	cmd := exec.Command(mainPath)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err = cmd.Run(); err != nil {
