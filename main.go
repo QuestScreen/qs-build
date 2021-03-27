@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	flags "github.com/jessevdk/go-flags"
@@ -39,7 +40,7 @@ func isInLocalQuestScreenRepo() bool {
 	return mod.Module.Mod.Path == "github.com/QuestScreen/QuestScreen"
 }
 
-var goPathSrc string
+var goPathSrc, goBin string
 
 func main() {
 	args, err := flags.Parse(&opts)
@@ -49,12 +50,22 @@ func main() {
 
 	{
 		cmd := exec.Command("go", "env", "GOPATH")
-		gopath := runAndCheck(cmd, func(err error, stderr string) {
+		gopath := strings.TrimSpace(runAndCheck(cmd, func(err error, stderr string) {
 			logError("failed to get GOPATH:")
 			logError(err.Error())
 			writeErrorLines(stderr)
-		})
-		goPathSrc = strings.SplitN(gopath, string(os.PathListSeparator), 2)[0] + "src"
+		}))
+		goPathFirst := strings.SplitN(gopath, string(os.PathListSeparator), 2)[0]
+		goPathSrc = filepath.Join(goPathFirst, "src")
+		cmd.Args[1] = "GOBIN"
+		goBin = strings.TrimSpace(runAndCheck(cmd, func(err error, stderr string) {
+			logError("failed to get GOBIN:")
+			logError(err.Error())
+			writeErrorLines(stderr)
+		}))
+		if goBin == "" {
+			goBin = filepath.Join(goPathFirst, "bin")
+		}
 	}
 
 	commands := []command{
@@ -142,6 +153,13 @@ func main() {
 		if commandEnabled[i] {
 			logPhase(commands[i].name)
 			commands[i].exec()
+		}
+	}
+	if doInstall {
+		if runtime.GOOS == "windows" {
+			os.Rename("questscreen.exe", filepath.Join(goBin, "questscreen.exe"))
+		} else {
+			os.Rename("questscreen", filepath.Join(goBin, "questscreen"))
 		}
 	}
 }
