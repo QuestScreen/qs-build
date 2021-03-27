@@ -31,12 +31,13 @@ func findQuestScreenModule() {
 	if mod, err = modfile.Parse("go.mod", raw, nil); err != nil {
 		os.Stderr.WriteString("[warning] unable to read go.mod:\n")
 		fmt.Fprintf(os.Stderr, "[warning] %s\n", err.Error())
-
+	} else {
+		if mod != nil && mod.Module != nil && mod.Module.Mod.Path == "github.com/QuestScreen/QuestScreen" {
+			return
+		}
 	}
-	if mod.Module.Mod.Path == "github.com/QuestScreen/QuestScreen" {
-		return
-	}
-	panic("current directory is not QuestScreen source directory")
+	logError("current directory is not QuestScreen source directory!")
+	os.Exit(1)
 }
 
 var goPathSrc, goBin string
