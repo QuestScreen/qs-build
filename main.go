@@ -18,26 +18,25 @@ type command struct {
 	exec                   func()
 }
 
-// isInLocalQuestScreenRepo checks if cwd is the root directory of the
-// QuestScreen source by trying to read the local go.mod file.
-func isInLocalQuestScreenRepo() bool {
+// findQuestScreenModule checks if cwd contains the QuestScreen module.
+func findQuestScreenModule() {
 	raw, err := ioutil.ReadFile("go.mod")
 	if err != nil {
 		if !os.IsNotExist(err) {
 			os.Stderr.WriteString("[warning] while reading go.mod: ")
 			os.Stderr.WriteString(err.Error() + "\n")
-			os.Stderr.WriteString("[warning] assuming we're not in a local QuestScreen source root\n")
 		}
-		return false
 	}
 	var mod *modfile.File
 	if mod, err = modfile.Parse("go.mod", raw, nil); err != nil {
 		os.Stderr.WriteString("[warning] unable to read go.mod:\n")
 		fmt.Fprintf(os.Stderr, "[warning] %s\n", err.Error())
-		os.Stderr.WriteString("[warning] assuming we're not in a local QuestScreen source root\n")
-		return false
+
 	}
-	return mod.Module.Mod.Path == "github.com/QuestScreen/QuestScreen"
+	if mod.Module.Mod.Path == "github.com/QuestScreen/QuestScreen" {
+		return
+	}
+	panic("current directory is not QuestScreen source directory")
 }
 
 var goPathSrc, goBin string
@@ -57,7 +56,7 @@ func main() {
 		}))
 		goPathFirst := strings.SplitN(gopath, string(os.PathListSeparator), 2)[0]
 		goPathSrc = filepath.Join(goPathFirst, "src")
-		cmd.Args[1] = "GOBIN"
+		cmd = exec.Command("go", "env", "GOBIN")
 		goBin = strings.TrimSpace(runAndCheck(cmd, func(err error, stderr string) {
 			logError("failed to get GOBIN:")
 			logError(err.Error())
@@ -117,22 +116,7 @@ func main() {
 		}
 	}
 
-	local := isInLocalQuestScreenRepo()
-	if local {
-		logInfo("using cwd as QuestScreen source directory")
-	} else {
-		if !doInstall {
-			panic("error: you are not within a QuestScreen source directory.")
-		}
-		logInfo("not in QuestScreen source directory; downloading it")
-		cmd := exec.Command("go", "get", "-d", "-u", "github.com/QuestScreen/QuestScreen")
-		runAndDumpIfVerbose(cmd, func(err error, stderr string) {
-			logError("failed to get github.com/QuestScreen/QuestScreen:")
-			logError(err.Error())
-			writeErrorLines(stderr)
-		})
-		os.Chdir(filepath.Join(goPathSrc, "github.com", "QuestScreen", "QuestScreen"))
-	}
+	findQuestScreenModule()
 
 	if opts.PluginFile != "" {
 		if opts.PluginFile, err = filepath.Abs(opts.PluginFile); err != nil {
