@@ -8,6 +8,16 @@ import (
 )
 
 func packAssets() {
+	required := make(map[string]struct{})
+	required["index.html"] = struct{}{}
+	if opts.wasm {
+		required["main.wasm"] = struct{}{}
+		required["wasm_exec.js"] = struct{}{}
+	} else {
+		required["main.js"] = struct{}{}
+		required["main.js.map"] = struct{}{}
+	}
+
 	if _, err := os.Stat("assets"); err != nil {
 		if os.IsNotExist(err) {
 			logError("`assets` directory not existing")
@@ -25,22 +35,20 @@ func packAssets() {
 			logError(err.Error())
 			os.Exit(1)
 		}
-		found := 0
 		for _, file := range files {
-			if file.Name() != "main.js" && file.Name() != "main.js.map" &&
-				file.Name() != "index.html" {
+			if _, ok := required[file.Name()]; ok {
+				delete(required, file.Name())
+			} else {
 				if err = os.RemoveAll(filepath.Join("assets", file.Name())); err != nil {
 					logError("failed to remove assets/" + file.Name() + ":")
 					logError(err.Error())
 					os.Exit(1)
 				}
-			} else {
-				found++
 			}
 		}
-		if found < 3 {
-			logError("one of these files in assets is missing: main.js main.js.map index.html")
-			logError("please run command `webui` before `assets`")
+		for key := range required {
+			logError("The file assets/%s is missing", key)
+			logError("Please run command `webui` before `assets`")
 			os.Exit(1)
 		}
 	}

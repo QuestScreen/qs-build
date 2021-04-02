@@ -28,12 +28,12 @@ func logVerbose(msg string) {
 	os.Stdout.WriteString("\n")
 }
 
-func logWarning(msg string) {
+func logWarning(msg string, a ...interface{}) {
 	yellowBold.Print("[warn] ")
-	color.Yellow(msg)
+	color.Yellow(msg, a...)
 }
 
-func logError(msg string) {
+func logError(msg string, a ...interface{}) {
 	redBold.Print("[error] ")
-	color.Red(msg)
+	color.Red(msg, a...)
 }

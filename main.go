@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	flags "github.com/jessevdk/go-flags"
@@ -45,24 +44,44 @@ var goPathSrc, goBin string
 func main() {
 	args, err := flags.Parse(&opts)
 	if err != nil {
-		panic(err)
+		logError(err.Error())
+		os.Exit(1)
+	}
+	if opts.Debug {
+		if opts.Web != "" && opts.Web != "gopherjs" {
+			logError("--debug does not allow web UI backend '%s'\n", opts.Web)
+			os.Exit(1)
+		}
+		opts.Web = "gopherjs"
+	}
+	if opts.Web == "" {
+		opts.Web = "wasm"
+	}
+	switch opts.Web {
+	case "", "wasm":
+		opts.wasm = true
+	case "gopherjs":
+		opts.wasm = false
+	default:
+		logError("unknown web backend: '%s'", opts.Web)
+		os.Exit(1)
 	}
 
 	{
 		cmd := exec.Command("go", "env", "GOPATH")
-		gopath := strings.TrimSpace(runAndCheck(cmd, func(err error, stderr string) {
+		gopath := runAndCheck(cmd, func(err error, stderr string) {
 			logError("failed to get GOPATH:")
 			logError(err.Error())
 			writeErrorLines(stderr)
-		}))
+		})
 		goPathFirst := strings.SplitN(gopath, string(os.PathListSeparator), 2)[0]
 		goPathSrc = filepath.Join(goPathFirst, "src")
 		cmd = exec.Command("go", "env", "GOBIN")
-		goBin = strings.TrimSpace(runAndCheck(cmd, func(err error, stderr string) {
+		goBin = runAndCheck(cmd, func(err error, stderr string) {
 			logError("failed to get GOBIN:")
 			logError(err.Error())
 			writeErrorLines(stderr)
-		}))
+		})
 		if goBin == "" {
 			goBin = filepath.Join(goPathFirst, "bin")
 		}
@@ -82,38 +101,34 @@ func main() {
 		{cmd: "compile", name: "Compile", description: "compiles main app", exec: compileQuestscreen},
 	}
 
-	doInstall := false
 	commandEnabled := make([]bool, len(commands))
 	if len(args) == 0 {
 		for i := range commandEnabled {
 			commandEnabled[i] = true
 		}
 	} else {
+		foundErrors := false
 		for i := range args {
 			found := false
-			if args[i] == "install" {
-				if len(args) != 1 {
-					panic("cannot give `install` along with other commands")
-				}
-				for j := range commands {
-					commandEnabled[j] = true
-				}
-				doInstall = true
-				break
-			}
 			for j := range commands {
 				if commands[j].cmd == args[i] {
 					found = true
 					if commandEnabled[j] {
-						panic("duplicate command: " + args[i])
+						logError("duplicate command: '%s'", args[i])
+						foundErrors = true
+					} else {
+						commandEnabled[j] = true
+						break
 					}
-					commandEnabled[j] = true
-					break
 				}
 			}
 			if !found {
-				panic("unknown command: " + args[i])
+				logError("unknown command: '%s'", args[i])
+				foundErrors = true
 			}
+		}
+		if foundErrors {
+			os.Exit(1)
 		}
 	}
 
@@ -121,7 +136,8 @@ func main() {
 
 	if opts.PluginFile != "" {
 		if opts.PluginFile, err = filepath.Abs(opts.PluginFile); err != nil {
-			panic(err)
+			logError(err.Error())
+			os.Exit(1)
 		}
 	}
 
@@ -138,13 +154,6 @@ func main() {
 		if commandEnabled[i] {
 			logPhase(commands[i].name)
 			commands[i].exec()
-		}
-	}
-	if doInstall {
-		if runtime.GOOS == "windows" {
-			os.Rename("questscreen.exe", filepath.Join(goBin, "questscreen.exe"))
-		} else {
-			os.Rename("questscreen", filepath.Join(goBin, "questscreen"))
 		}
 	}
 }
