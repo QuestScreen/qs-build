@@ -53,6 +53,19 @@ func packAssets() {
 		}
 	}
 
+	apiPath := runAndCheck(exec.Command("go", "list", "-f", "{{.Dir}}", "-m",
+		"github.com/QuestScreen/api"), func(err error, stderr string) {
+		logError("failed to get path to api resources:")
+		logError(err.Error())
+		writeErrorLines(stderr)
+	})
+	logInfo("copying assets from api resources")
+	if err := CopyDir(filepath.Join(apiPath, "web", "assets"), "assets"); err != nil {
+		logError("failed to copy api resources:")
+		logError(err.Error())
+		os.Exit(1)
+	}
+
 	logInfo("copying web assets into `assets`")
 	if err := CopyDir("web/assets", "assets"); err != nil {
 		logError("failed to copy `web/assets` folder to `assets`:")
