@@ -32,10 +32,10 @@ func buildWebUI() {
 	logInfo("running askew")
 	var cmd *exec.Cmd
 	if opts.wasm {
-		cmd = exec.Command("askew", "-o", "assets", "-b", "wasm",
+		cmd = exec.Command("askew", "-o", "assets", "-b", "wasm", "-d", "plugins/plugins.yaml",
 			"--exclude", "app,assets,build-doc,data,display,main,shared", ".")
 	} else {
-		cmd = exec.Command("askew", "-o", "assets", "-b", "gopherjs",
+		cmd = exec.Command("askew", "-o", "assets", "-b", "gopherjs", "-d", "plugins/plugins.yaml",
 			"--exclude", "app,assets,build-doc,data,display,main,shared", ".")
 	}
 	runAndDumpIfVerbose(cmd,

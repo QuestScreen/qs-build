@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 )
 
 func packAssets() {
@@ -72,7 +74,38 @@ func packAssets() {
 		logError(err.Error())
 		os.Exit(1)
 	}
-	// TODO: assets from plugins
+
+	{
+		var plugins Data
+		pluginYamlFile, err := ioutil.ReadFile(filepath.Join("plugins", "plugins.yaml"))
+		if err != nil {
+			logError("missing file: plugins/plugins.yaml")
+			logError("please run command `plugins` before `assets`.")
+			os.Exit(1)
+		}
+		if err = yaml.Unmarshal(pluginYamlFile, &plugins); err != nil {
+			logError("failed to read plugins/plugins.yaml:")
+			logError(err.Error())
+			os.Exit(1)
+		}
+		for _, p := range plugins {
+			logInfo("copying assets of plugin " + p.ID)
+			pluginAssetsPath := filepath.Join("assets", p.ID)
+			if err = os.Mkdir(pluginAssetsPath, 0755); err != nil {
+				logError(err.Error())
+				os.Exit(1)
+			}
+			for _, a := range p.Assets {
+				assetTargetPath := filepath.Join(pluginAssetsPath, a)
+				os.MkdirAll(filepath.Dir(assetTargetPath), 0755)
+				if err = CopyFile(filepath.Join(p.DirPath, a), assetTargetPath); err != nil {
+					logError(err.Error())
+					os.Exit(1)
+				}
+			}
+		}
+	}
+
 	logInfo("packaging assets into assets/assets.go")
 	runAndDumpIfVerbose(exec.Command("go-bindata", "-ignore=assets\\.go",
 		"-ignore=main\\.js\\.map", "-o", "assets/assets.go", "-pkg", "assets",
