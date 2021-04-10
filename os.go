@@ -11,8 +11,10 @@ var opts struct {
 	Verbose    bool   `short:"v" long:"verbose" description:"Show verbose debug information"`
 	Debug      bool   `short:"d" long:"debug" description:"Build an executable for debugging (includes JS source map and Go sources). Implies --web=gopherjs"`
 	Web        string `short:"w" long:"web" description:"Backend to use for the web UI. Either 'wasm' (default) or 'gopherjs'."`
-	PluginFile string `shord:"p" long:"pluginFile" description:"Path to a file that contains the import paths of all plugins you want to use" optional:"true"`
+	PluginFile string `short:"p" long:"pluginFile" description:"Path to a file that contains the import paths of all plugins you want to use" optional:"true"`
+	Binary     string `short:"b" long:"binary" description:"use with 'release' to build a binary release. Value specifies platform. Currently, only 'windows' is supported."`
 	wasm       bool
+	rKind      ReleaseKind
 }
 
 func runAndCheck(cmd *exec.Cmd, errorHandler func(err error, stderr string)) string {
@@ -58,6 +60,25 @@ func checkRename(src, dst string) {
 	if err := os.Rename(src, dst); err != nil {
 		logError("while renaming '%s' to '%s':", src, dst)
 		logError(err.Error())
+		os.Exit(1)
+	}
+}
+
+func must(err error, errMsg ...string) {
+	if err != nil {
+		for _, msg := range errMsg {
+			logError(msg)
+		}
+		logError(err.Error())
+		os.Exit(1)
+	}
+}
+
+func mustCond(cond bool, errMsg ...string) {
+	if !cond {
+		for _, msg := range errMsg {
+			logError(msg)
+		}
 		os.Exit(1)
 	}
 }

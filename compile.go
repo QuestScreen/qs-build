@@ -16,7 +16,7 @@ var CurrentVersion = "{{.Version}}"
 var Date = "{{.Date}}"
 `))
 
-func genVersionInfo(out io.Writer) {
+func genVersionInfo(out io.Writer) string {
 	data := struct {
 		Version string
 		Date    time.Time
@@ -25,37 +25,43 @@ func genVersionInfo(out io.Writer) {
 	if err := versioninfoTmpl.Execute(out, data); err != nil {
 		logError(err.Error())
 	}
+	return data.Version
 }
 
-func writeVersionInfo() {
-	if err := os.MkdirAll("versioninfo", 0755); err != nil {
-		logError(err.Error())
-		os.Exit(1)
-	}
+func writeVersionInfo() string {
+	must(os.MkdirAll("versioninfo", 0755))
 
 	os.Chdir("versioninfo")
 	defer os.Chdir("..")
 
 	out, err := os.Create("versioninfo.go")
-	if err != nil {
-		logError(err.Error())
-		os.Exit(1)
-	}
+	must(err)
 	defer out.Close()
-	genVersionInfo(out)
+	return genVersionInfo(out)
 }
 
-func compileQuestscreen() {
+func isWorkingDir() bool {
 	info, err := os.Stat(".git")
 	if err != nil {
 		if !os.IsNotExist(err) {
-			logError(err.Error())
-			os.Exit(1)
+			must(err)
 		}
-		logInfo("release mode (not in git repository)")
-	} else if info.IsDir() {
+		return false
+	}
+	if info.IsDir() {
+		return true
+	}
+	return false
+}
+
+func compileQuestscreen() {
+	if isWorkingDir() {
 		logInfo("development mode (in git repository)")
 		writeVersionInfo()
+	} else {
+		_, err := os.Stat("versioninfo/versioninfo.go")
+		must(err, "cannot compile: not in git repository unable to access versioninfo/versioninfo.go:")
+		logInfo("release mode (not in git repository)")
 	}
 
 	os.Chdir("main")

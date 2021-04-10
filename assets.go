@@ -78,16 +78,8 @@ func packAssets() {
 	{
 		var plugins Data
 		pluginYamlFile, err := ioutil.ReadFile(filepath.Join("plugins", "plugins.yaml"))
-		if err != nil {
-			logError("missing file: plugins/plugins.yaml")
-			logError("please run command `plugins` before `assets`.")
-			os.Exit(1)
-		}
-		if err = yaml.Unmarshal(pluginYamlFile, &plugins); err != nil {
-			logError("failed to read plugins/plugins.yaml:")
-			logError(err.Error())
-			os.Exit(1)
-		}
+		mustCond(err == nil, "missing file: plugins/plugins.yaml", "please run command `plugins` before `assets`.")
+		must(yaml.Unmarshal(pluginYamlFile, &plugins), "failed to read plugins/plugins.yaml:")
 		for _, p := range plugins {
 			logInfo("copying assets of plugin " + p.ID)
 			pluginAssetsPath := filepath.Join("assets", p.ID)
@@ -98,10 +90,7 @@ func packAssets() {
 			for _, a := range append(p.Assets.CSS, p.Assets.Other...) {
 				assetTargetPath := filepath.Join(pluginAssetsPath, a)
 				os.MkdirAll(filepath.Dir(assetTargetPath), 0755)
-				if err = CopyFile(filepath.Join(p.DirPath, "web", "assets", a), assetTargetPath); err != nil {
-					logError(err.Error())
-					os.Exit(1)
-				}
+				must(CopyFile(filepath.Join(p.DirPath, "web", "assets", a), assetTargetPath))
 			}
 		}
 	}
@@ -149,16 +138,10 @@ func packAssets() {
 			logError("after solving the problem, remove `vendor` before trying again")
 			os.Exit(1)
 		}
-		if err := os.MkdirAll("assets/github.com/QuestScreen/QuestScreen", 0755); err != nil {
-			logError("failed to create directory assets/github.com/QuestScreen/QuestScreen:")
-			logError(err.Error())
-			os.Exit(1)
-		}
-		if err := CopyDir("web", "assets/github.com/QuestScreen/QuestScreen/web"); err != nil {
-			logError("failed to copy Go sources into assets:")
-			logError(err.Error())
-			os.Exit(1)
-		}
+		must(os.MkdirAll("assets/github.com/QuestScreen/QuestScreen", 0755),
+			"failed to create directory assets/github.com/QuestScreen/QuestScreen:")
+		must(CopyDir("web", "assets/github.com/QuestScreen/QuestScreen/web"),
+			"failed to copy Go sources into assets:")
 		os.RemoveAll("assets/github.com/QuestScreen/QuestScreen/web/assets")
 		logInfo("re-packaging to include source files")
 		runAndDumpIfVerbose(exec.Command("go-bindata", "-ignore=assets\\.go",

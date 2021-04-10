@@ -25,15 +25,14 @@ func writeFormatted(goCode string, file string) {
 	stdin.Close()
 
 	if err := fmtcmd.Run(); err != nil {
-		log.Println("error while formatting: " + err.Error())
-		log.Println("stderr output:")
-		log.Println(stderr.String())
-		log.Println("input:")
+		logError("failed to format Go code:")
+		logError(err.Error())
+		logError("stderr output:")
+		writeErrorLines(stderr.String())
+		logError("input:")
 		log.Println(goCode)
-		panic("failed to format Go code")
+		os.Exit(1)
 	}
 
-	if err := ioutil.WriteFile(file, stdout.Bytes(), os.ModePerm); err != nil {
-		panic("failed to write file '" + file + "': " + err.Error())
-	}
+	must(ioutil.WriteFile(file, stdout.Bytes(), os.ModePerm))
 }
