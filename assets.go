@@ -95,10 +95,10 @@ func packAssets() {
 				logError(err.Error())
 				os.Exit(1)
 			}
-			for _, a := range p.Assets {
+			for _, a := range append(p.Assets.CSS, p.Assets.Other...) {
 				assetTargetPath := filepath.Join(pluginAssetsPath, a)
 				os.MkdirAll(filepath.Dir(assetTargetPath), 0755)
-				if err = CopyFile(filepath.Join(p.DirPath, a), assetTargetPath); err != nil {
+				if err = CopyFile(filepath.Join(p.DirPath, "web", "assets", a), assetTargetPath); err != nil {
 					logError(err.Error())
 					os.Exit(1)
 				}

@@ -46,12 +46,17 @@ type pluginTemplates struct {
 	Systems map[string]systemTmpl
 }
 
+type AssetData struct {
+	CSS   []string
+	Other []string
+}
+
 // PluginDescr loads the content of a questscreen-plugin.yaml file.
 type PluginDescr struct {
 	Name, importPath, dirPath string
 	Modules                   []string
 	Templates                 pluginTemplates
-	assets                    []string
+	assets                    AssetData
 }
 
 type sceneTmplData struct {
@@ -78,14 +83,14 @@ type pluginData struct {
 	ImportPath, DirPath, ID, Name string
 	Modules                       []moduleData
 	Templates                     pluginTemplateData
-	Assets                        []string
+	Assets                        AssetData
 }
 
 // Data holds the processed metadata for plugins.
 // All maps are transformed into slices for reproducible indexing.
 type Data []pluginData
 
-func addAssets(rootPath, dirPath string, assets *[]string) {
+func addAssets(rootPath, dirPath string, assets *AssetData) {
 	assetFiles, err := ioutil.ReadDir(dirPath)
 	if err != nil {
 		panic(err)
@@ -103,7 +108,12 @@ func addAssets(rootPath, dirPath string, assets *[]string) {
 			if err != nil {
 				panic(err)
 			}
-			*assets = append(*assets, rel)
+			ext := filepath.Ext(assetFile.Name())
+			if strings.ToLower(ext) == ".css" {
+				assets.CSS = append(assets.CSS, rel)
+			} else {
+				assets.Other = append(assets.Other, rel)
+			}
 		}
 	}
 }
