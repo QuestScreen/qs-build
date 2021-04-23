@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -17,29 +19,122 @@ type command struct {
 	exec                   func()
 }
 
+var goBin, apiImport, goModPath, goSumPath string
+var goModStat, goSumStat os.FileInfo
+var goModContent, goSumContent []byte
+var externalPlugins bool
+
 // findQuestScreenModule checks if cwd contains the QuestScreen module.
 func findQuestScreenModule() {
-	raw, err := ioutil.ReadFile("go.mod")
-	if err != nil {
-		if !os.IsNotExist(err) {
-			os.Stderr.WriteString("[warning] while reading go.mod: ")
-			os.Stderr.WriteString(err.Error() + "\n")
+	var err error
+	goModPath, err = filepath.Abs("go.mod")
+	must(err, "failed to find go.mod:")
+	goModStat, err = os.Stat(goModPath)
+	must(err)
+	goModContent, err = ioutil.ReadFile(goModPath)
+	if err == nil {
+		goSumPath, err = filepath.Abs("go.sum")
+		must(err)
+		goSumStat, err = os.Stat(goSumPath)
+		must(err)
+		goSumContent, err = ioutil.ReadFile(goSumPath)
+		must(err)
+
+		var mod *modfile.File
+		if mod, err = modfile.Parse("go.mod", goModContent, nil); err != nil {
+			logWarning("unable to parse go.mod: %v", err.Error())
+		} else {
+			if mod != nil && mod.Module != nil && mod.Module.Mod.Path == "github.com/QuestScreen/QuestScreen" {
+				for _, r := range mod.Require {
+					if r.Mod.Path == "github.com/QuestScreen/api" {
+						apiImport = "github.com/QuestScreen/api"
+						if r.Mod.Version != "" {
+							apiImport += "@" + r.Mod.Version
+						}
+						return
+					}
+				}
+				logError("failed to find reference to github.com/QuestScreen/api in go.mod")
+				finalize(true)
+			}
 		}
-	}
-	var mod *modfile.File
-	if mod, err = modfile.Parse("go.mod", raw, nil); err != nil {
-		os.Stderr.WriteString("[warning] unable to read go.mod:\n")
-		fmt.Fprintf(os.Stderr, "[warning] %s\n", err.Error())
 	} else {
-		if mod != nil && mod.Module != nil && mod.Module.Mod.Path == "github.com/QuestScreen/QuestScreen" {
-			return
+		if !os.IsNotExist(err) {
+			logWarning("while reading go.mod: %v", err.Error())
 		}
 	}
+
 	logError("current directory is not QuestScreen source directory!")
-	os.Exit(1)
+	finalize(true)
 }
 
-var goPathSrc, goBin string
+func finalize(exitError bool) {
+	if externalPlugins {
+		ioutil.WriteFile(goModPath, goModContent, goModStat.Mode())
+		ioutil.WriteFile(goSumPath, goSumContent, goSumStat.Mode())
+	}
+	if exitError {
+		os.Exit(1)
+	}
+}
+
+func parsePluginsFile(path string) {
+	logPhase("Init")
+
+	pFile, err := os.Open(path)
+	must(err)
+	defer pFile.Close()
+	reader := bufio.NewReader(pFile)
+	var line string
+	lineCount := 0
+	for err != io.EOF {
+		line, err = reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			break
+		}
+		lineCount++
+		if line = strings.TrimSpace(line); line == "" {
+			continue
+		}
+		items := strings.Split(line, " ")
+		descr := pluginDescr{line: lineCount}
+		if idx := strings.IndexByte(items[len(items)-1], '@'); idx >= 0 {
+			descr.version = items[len(items)-1][idx+1:]
+			items[len(items)-1] = items[len(items)-1][:idx]
+		}
+		switch len(items) {
+		case 0:
+			continue
+		case 1:
+			descr.importPath = items[0]
+			descr.id = filepath.Base(descr.importPath)
+		case 2:
+			descr.importPath = items[1]
+			descr.id = items[0]
+		default:
+			panic(fmt.Sprintf("%s(%v): too many items in line", opts.PluginFile, lineCount))
+		}
+		var getPath string
+		if descr.version == "" {
+			getPath = descr.importPath
+		} else {
+			getPath = fmt.Sprintf("%s@%s", descr.importPath, descr.version)
+		}
+		logInfo(fmt.Sprintf("loading plugin '%s' at \"%s\"", descr.id, getPath))
+		runAndCheck(exec.Command("go", "get", "-u", getPath), func(err error, stderr string) {
+			logError(err.Error())
+			writeErrorLines(stderr)
+		})
+		externalPlugins = true
+
+		descr.dir = runAndCheck(exec.Command("go", "list", "-m", "-f", "{{.Dir}}", descr.importPath), func(err error, stderr string) {
+			logError(err.Error())
+			writeErrorLines(stderr)
+		})
+
+		opts.chosenPlugins = append(opts.chosenPlugins, descr)
+	}
+}
 
 func main() {
 	args, err := flags.Parse(&opts)
@@ -50,7 +145,7 @@ func main() {
 	if opts.Debug {
 		if opts.Web != "" && opts.Web != "gopherjs" {
 			logError("--debug does not allow web UI backend '%s'\n", opts.Web)
-			os.Exit(1)
+			finalize(true)
 		}
 		opts.Web = "gopherjs"
 	}
@@ -64,7 +159,7 @@ func main() {
 		opts.wasm = false
 	default:
 		logError("unknown web backend: '%s'", opts.Web)
-		os.Exit(1)
+		finalize(true)
 	}
 
 	commands := []command{
@@ -78,7 +173,8 @@ func main() {
 			exec: buildWebUI},
 		{cmd: "assets", name: "Assets", description: "packages all web files in assets/ into assets/assets.go",
 			exec: packAssets},
-		{cmd: "compile", name: "Compile", description: "compiles main app", exec: compileQuestscreen},
+		{cmd: "compile", name: "Compile", description: "compiles main app",
+			exec: compileQuestscreen},
 	}
 
 	commandEnabled := make([]bool, len(commands))
@@ -118,7 +214,7 @@ func main() {
 			}
 		}
 		if foundErrors {
-			os.Exit(1)
+			finalize(true)
 		}
 	}
 
@@ -130,7 +226,6 @@ func main() {
 			writeErrorLines(stderr)
 		})
 		goPathFirst := strings.SplitN(gopath, string(os.PathListSeparator), 2)[0]
-		goPathSrc = filepath.Join(goPathFirst, "src")
 		cmd = exec.Command("go", "env", "GOBIN")
 		goBin = runAndCheck(cmd, func(err error, stderr string) {
 			logError("failed to get GOBIN:")
@@ -152,7 +247,7 @@ func main() {
 			opts.rKind = ReleaseWindowsBinary
 		default:
 			logError("unknown binary release platform: " + opts.Binary)
-			os.Exit(1)
+			finalize(true)
 		}
 		release(opts.rKind)
 	} else {
@@ -160,9 +255,14 @@ func main() {
 			"this option may only be given for command 'release'")
 	}
 
+	if opts.PluginFile == "" {
+		info, err := os.Stat("plugins/plugins.txt")
+		if err == nil && !info.IsDir() {
+			opts.PluginFile = "plugins/plugins.txt"
+		}
+	}
 	if opts.PluginFile != "" {
-		opts.PluginFile, err = filepath.Abs(opts.PluginFile)
-		must(err)
+		parsePluginsFile(opts.PluginFile)
 	}
 
 	if _, err := os.Stat("assets"); err != nil {
@@ -178,4 +278,5 @@ func main() {
 			commands[i].exec()
 		}
 	}
+	finalize(false)
 }

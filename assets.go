@@ -24,18 +24,18 @@ func packAssets() {
 		if os.IsNotExist(err) {
 			logError("`assets` directory not existing")
 			logError("please execute command `webui` before `assets`")
-			os.Exit(1)
+			finalize(true)
 		}
 		logError("failed to query for assets directory:")
 		logError(err.Error())
-		os.Exit(1)
+		finalize(true)
 	} else {
 		logInfo("cleaning up")
 		files, err := ioutil.ReadDir("assets")
 		if err != nil {
 			logError("failed to read `assets` directory:")
 			logError(err.Error())
-			os.Exit(1)
+			finalize(true)
 		}
 		for _, file := range files {
 			if _, ok := required[file.Name()]; ok {
@@ -44,14 +44,14 @@ func packAssets() {
 				if err = os.RemoveAll(filepath.Join("assets", file.Name())); err != nil {
 					logError("failed to remove assets/" + file.Name() + ":")
 					logError(err.Error())
-					os.Exit(1)
+					finalize(true)
 				}
 			}
 		}
 		for key := range required {
 			logError("The file assets/%s is missing", key)
 			logError("Please run command `webui` before `assets`")
-			os.Exit(1)
+			finalize(true)
 		}
 	}
 
@@ -65,14 +65,14 @@ func packAssets() {
 	if err := CopyDir(filepath.Join(apiPath, "web", "assets"), "assets"); err != nil {
 		logError("failed to copy api resources:")
 		logError(err.Error())
-		os.Exit(1)
+		finalize(true)
 	}
 
 	logInfo("copying web assets into `assets`")
 	if err := CopyDir("web/assets", "assets"); err != nil {
 		logError("failed to copy `web/assets` folder to `assets`:")
 		logError(err.Error())
-		os.Exit(1)
+		finalize(true)
 	}
 
 	{
@@ -85,7 +85,7 @@ func packAssets() {
 			pluginAssetsPath := filepath.Join("assets", p.ID)
 			if err = os.Mkdir(pluginAssetsPath, 0755); err != nil {
 				logError(err.Error())
-				os.Exit(1)
+				finalize(true)
 			}
 			for _, a := range append(p.Assets.CSS, p.Assets.Other...) {
 				assetTargetPath := filepath.Join(pluginAssetsPath, a)
@@ -118,7 +118,7 @@ func packAssets() {
 			logError("failed to read generated `vendor` directory:")
 			logError(err.Error())
 			logError("after solving the problem, remove `vendor` before trying again")
-			os.Exit(1)
+			finalize(true)
 		}
 		for _, item := range items {
 			if item.IsDir() {
@@ -128,7 +128,7 @@ func packAssets() {
 						item.Name() + ":")
 					logError(err.Error())
 					logError("after solving the problem, remove `vendor` before trying again")
-					os.Exit(1)
+					finalize(true)
 				}
 			}
 		}
@@ -136,7 +136,7 @@ func packAssets() {
 			logError("failed to remove `vendor` directory:")
 			logError(err.Error())
 			logError("after solving the problem, remove `vendor` before trying again")
-			os.Exit(1)
+			finalize(true)
 		}
 		must(os.MkdirAll("assets/github.com/QuestScreen/QuestScreen", 0755),
 			"failed to create directory assets/github.com/QuestScreen/QuestScreen:")

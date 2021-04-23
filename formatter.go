@@ -31,7 +31,7 @@ func writeFormatted(goCode string, file string) {
 		writeErrorLines(stderr.String())
 		logError("input:")
 		log.Println(goCode)
-		os.Exit(1)
+		finalize(true)
 	}
 
 	must(ioutil.WriteFile(file, stdout.Bytes(), os.ModePerm))

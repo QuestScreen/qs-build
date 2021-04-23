@@ -59,14 +59,14 @@ func buildWebUI() {
 			logError("while trying to get GOROOT:")
 			logError(err.Error())
 			writeErrorLines(stderr)
-			os.Exit(1)
+			finalize(true)
 		})
 		os.Chdir("../..")
 		checkRename("web/main/main.wasm", "assets/main.wasm")
 		if err := copy(filepath.Join(goroot, "misc/wasm/wasm_exec.js"), "assets/wasm_exec.js"); err != nil {
 			logError("while copying 'wasm_exec.js:")
 			logError(err.Error())
-			os.Exit(1)
+			finalize(true)
 		}
 	} else {
 		logInfo("compiling code to JavaScript")
