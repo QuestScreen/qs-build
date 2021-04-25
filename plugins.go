@@ -528,7 +528,8 @@ func writePluginLoaders() {
 	plugins := process(discoverPlugins())
 
 	for _, plugin := range plugins {
-		for _, value := range plugin.Templates.Systems {
+		for i := range plugin.Templates.Systems {
+			value := &plugin.Templates.Systems[i]
 			if value.Config == nil {
 				value.Config = make(map[string]interface{})
 			}
