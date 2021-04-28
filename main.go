@@ -136,6 +136,21 @@ func parsePluginsFile(path string) {
 	}
 }
 
+var commands = []command{
+	{cmd: "deps", name: "Dependencies",
+		description: "Ensures that all dependencies required for building QuestScreen are available",
+		exec:        ensureDepsAvailable},
+	{cmd: "plugins", name: "Plugins",
+		description: "walks the plugins directory and discovers all plugins there. Writes code for loading the plugins in web UI and main app",
+		exec:        writePluginLoaders},
+	{cmd: "webui", name: "Web UI", description: "compiles web UI to assets/main.js",
+		exec: buildWebUI},
+	{cmd: "assets", name: "Assets", description: "packages all web files in assets/ into assets/assets.go",
+		exec: packAssets},
+	{cmd: "compile", name: "Compile", description: "compiles main app",
+		exec: compileQuestscreen},
+}
+
 func main() {
 	args, err := flags.Parse(&opts)
 	if flags.WroteHelp(err) {
@@ -160,21 +175,6 @@ func main() {
 	default:
 		logError("unknown web backend: '%s'", opts.Web)
 		finalize(true)
-	}
-
-	commands := []command{
-		{cmd: "deps", name: "Dependencies",
-			description: "Ensures that all dependencies required for building QuestScreen are available",
-			exec:        ensureDepsAvailable},
-		{cmd: "plugins", name: "Plugins",
-			description: "walks the plugins directory and discovers all plugins there. Writes code for loading the plugins in web UI and main app",
-			exec:        writePluginLoaders},
-		{cmd: "webui", name: "Web UI", description: "compiles web UI to assets/main.js",
-			exec: buildWebUI},
-		{cmd: "assets", name: "Assets", description: "packages all web files in assets/ into assets/assets.go",
-			exec: packAssets},
-		{cmd: "compile", name: "Compile", description: "compiles main app",
-			exec: compileQuestscreen},
 	}
 
 	commandEnabled := make([]bool, len(commands))
