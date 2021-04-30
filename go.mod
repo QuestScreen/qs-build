@@ -5,6 +5,7 @@ go 1.12
 require (
 	github.com/QuestScreen/api v0.3.1-0.20210428171433-ca9199676fb2
 	github.com/fatih/color v1.10.0
+	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/veandco/go-sdl2 v0.4.5 // indirect
 	golang.org/x/mod v0.3.0

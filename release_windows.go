@@ -9,7 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+
+	"github.com/go-ole/go-ole"
+	"github.com/go-ole/go-ole/oleutil"
 )
 
 func findDll(name string) string {
@@ -20,7 +24,7 @@ func findDll(name string) string {
 	return strings.TrimSpace(path)
 }
 
-func createFullscreenLink(path string) {
+func createFullscreenLink(path string) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -42,8 +46,10 @@ func createFullscreenLink(path string) {
 		return err
 	}
 	idispatch := cs.ToIDispatch()
-	oleutil.PutProperty(idispatch, "TargetPath", "questscreen.exe")
+	oleutil.PutProperty(idispatch, "TargetPath", "%COMSPEC%")
+	oleutil.PutProperty(idispatch, "Arguments", "/C .\\questscreen.exe -f")
 	oleutil.CallMethod(idispatch, "Save")
+	return nil
 }
 
 func releaseWindowsBinary(relname string) {
@@ -61,7 +67,7 @@ func releaseWindowsBinary(relname string) {
 	}
 
 	logInfo("summoning OLE from the depths of hell to create fullscreen link")
-	createFullscreenLink("questscreen - fullscreen.lnk")
+	must(createFullscreenLink("questscreen - fullscreen.lnk"))
 	defer os.Remove("questscreen - fullscreen.lnk")
 
 	logInfo("creating " + relname + ".zip")
@@ -104,7 +110,7 @@ func releaseWindowsBinary(relname string) {
 	for _, lib := range libs {
 		addFiles(filepath.Dir(lib), lib)
 	}
-	addFiles(".", "questscreen.exe -f")
+	addFiles(".", "questscreen.exe")
 	addFiles(".", "questscreen - fullscreen.lnk")
 	addFiles(".", "resources")
 }
