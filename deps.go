@@ -8,7 +8,7 @@ import (
 
 func ensureAvailable(importPath string) {
 	logInfo("ensuring availability of " + importPath)
-	cmd := exec.Command("go", "get", importPath)
+	cmd := exec.Command(goCmd, "get", importPath)
 	runAndDumpIfVerbose(cmd, func(err error, stderr string) {
 		logError("failed to get " + importPath + ":")
 		logError(err.Error())

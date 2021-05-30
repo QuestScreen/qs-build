@@ -55,7 +55,7 @@ func packAssets() {
 		}
 	}
 
-	apiPath := runAndCheck(exec.Command("go", "list", "-f", "{{.Dir}}", "-m",
+	apiPath := runAndCheck(exec.Command(goCmd, "list", "-f", "{{.Dir}}", "-m",
 		"github.com/QuestScreen/api"), func(err error, stderr string) {
 		logError("failed to get path to api resources:")
 		logError(err.Error())
@@ -96,7 +96,8 @@ func packAssets() {
 	}
 
 	logInfo("packaging assets into assets/assets.go")
-	runAndDumpIfVerbose(exec.Command("go-bindata", "-ignore=assets\\.go",
+	goBindataCmd := filepath.Join(goBin, "go-bindata")
+	runAndDumpIfVerbose(exec.Command(goBindataCmd, "-ignore=assets\\.go",
 		"-ignore=main\\.js\\.map", "-o", "assets/assets.go", "-pkg", "assets",
 		"-prefix", "assets/", "assets/..."),
 		func(err error, stderr string) {
@@ -107,7 +108,7 @@ func packAssets() {
 
 	if opts.Debug {
 		logInfo("bunding Go source files for JavaScript debugging")
-		runAndCheck(exec.Command("go", "mod", "vendor"),
+		runAndCheck(exec.Command(goCmd, "mod", "vendor"),
 			func(err error, stderr string) {
 				logError("failed to execute `go mod vendor`:")
 				logError(err.Error())
@@ -144,7 +145,7 @@ func packAssets() {
 			"failed to copy Go sources into assets:")
 		os.RemoveAll("assets/github.com/QuestScreen/QuestScreen/web/assets")
 		logInfo("re-packaging to include source files")
-		runAndDumpIfVerbose(exec.Command("go-bindata", "-ignore=assets\\.go",
+		runAndDumpIfVerbose(exec.Command(goBindataCmd, "-ignore=assets\\.go",
 			"-o", "assets/assets.go", "-pkg", "assets",
 			"-prefix", "assets/", "assets/..."),
 			func(err error, stderr string) {

@@ -30,12 +30,13 @@ func copy(src, dst string) error {
 
 func buildWebUI() {
 	logInfo("running askew")
+	askewCmd := filepath.Join(goBin, "askew")
 	var cmd *exec.Cmd
 	if opts.wasm {
-		cmd = exec.Command("askew", "-o", "assets", "-b", "wasm", "-d", "plugins/plugins.yaml",
+		cmd = exec.Command(askewCmd, "-o", "assets", "-b", "wasm", "-d", "plugins/plugins.yaml",
 			"--exclude", "app,assets,build-doc,data,display,main,shared", ".")
 	} else {
-		cmd = exec.Command("askew", "-o", "assets", "-b", "gopherjs", "-d", "plugins/plugins.yaml",
+		cmd = exec.Command(askewCmd, "-o", "assets", "-b", "gopherjs", "-d", "plugins/plugins.yaml",
 			"--exclude", "app,assets,build-doc,data,display,main,shared", ".")
 	}
 	runAndDumpIfVerbose(cmd,
@@ -48,14 +49,14 @@ func buildWebUI() {
 
 	if opts.wasm {
 		logInfo("compiling code to WASM")
-		cmd := exec.Command("go", "build", "-o", "main.wasm")
+		cmd := exec.Command(goCmd, "build", "-o", "main.wasm")
 		cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
 		runAndDumpIfVerbose(cmd, func(err error, stderr string) {
 			logError("failed to compile web UI:")
 			logError(err.Error())
 			writeErrorLines(stderr)
 		})
-		goroot := runAndCheck(exec.Command("go", "env", "GOROOT"), func(err error, stderr string) {
+		goroot := runAndCheck(exec.Command(goCmd, "env", "GOROOT"), func(err error, stderr string) {
 			logError("while trying to get GOROOT:")
 			logError(err.Error())
 			writeErrorLines(stderr)
@@ -77,7 +78,7 @@ func buildWebUI() {
 				writeErrorLines(stderr)
 			})
 
-		cmd := exec.Command("gopherjs", "build")
+		cmd := exec.Command(filepath.Join(goBin, "gopherjs"), "build")
 		if runtime.GOOS == "windows" {
 			cmd.Env = append(os.Environ(), "GOPHERJS_GOROOT="+gopherjsRoot, "GOOS=linux")
 		} else {

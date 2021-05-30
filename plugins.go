@@ -431,12 +431,12 @@ func executeInspector(pluginImportPath, moduleName, moduleID string,
 		dirPath, err = ioutil.TempDir("", "questscreen")
 		must(err, "failed to create temporary directory:")
 		os.Chdir(dirPath)
-		runAndCheck(exec.Command("go", "mod", "init", "QuestScreen/tmp"),
+		runAndCheck(exec.Command(goCmd, "mod", "init", "QuestScreen/tmp"),
 			func(err error, stderr string) {
 				logError(err.Error())
 				writeErrorLines(stderr)
 			})
-		runAndCheck(exec.Command("go", "get", "-u", pluginImportPath, apiImport,
+		runAndCheck(exec.Command(goCmd, "get", "-u", pluginImportPath, apiImport,
 			"github.com/QuestScreen/qs-build"),
 			func(err error, stderr string) {
 				logError(err.Error())
@@ -479,7 +479,7 @@ func executeInspector(pluginImportPath, moduleName, moduleID string,
 		mainName = "main"
 	}
 
-	runAndDumpIfVerbose(exec.Command("go", "build", "-o", mainName),
+	runAndDumpIfVerbose(exec.Command(goCmd, "build", "-o", mainName),
 		func(err error, stderr string) {
 			logError(fmt.Sprintf("%v/%v [tmpdir: %v]:",
 				pluginImportPath, moduleName, dirPath))

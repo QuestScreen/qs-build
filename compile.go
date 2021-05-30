@@ -72,7 +72,7 @@ func compileQuestscreen() {
 		exeName = "../questscreen"
 	}
 	logInfo("compiling code")
-	runAndDumpIfVerbose(exec.Command("go", "build", "-o", exeName),
+	runAndDumpIfVerbose(exec.Command(goCmd, "build", "-o", exeName),
 		func(err error, stderr string) {
 			logError("failed to compile QuestScreen:")
 			logError(err.Error())

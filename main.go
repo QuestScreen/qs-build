@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"go/build"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,7 +20,7 @@ type command struct {
 	exec                   func()
 }
 
-var goBin, apiImport, goModPath, goSumPath string
+var goCmd, goBin, apiImport, goModPath, goSumPath string
 var goModStat, goSumStat os.FileInfo
 var goModContent, goSumContent []byte
 var externalPlugins bool
@@ -121,13 +122,13 @@ func parsePluginsFile(path string) {
 			getPath = fmt.Sprintf("%s@%s", descr.importPath, descr.version)
 		}
 		logInfo(fmt.Sprintf("loading plugin '%s' at \"%s\"", descr.id, getPath))
-		runAndCheck(exec.Command("go", "get", "-u", getPath), func(err error, stderr string) {
+		runAndCheck(exec.Command(goCmd, "get", "-u", getPath), func(err error, stderr string) {
 			logError(err.Error())
 			writeErrorLines(stderr)
 		})
 		externalPlugins = true
 
-		descr.dir = runAndCheck(exec.Command("go", "list", "-m", "-f", "{{.Dir}}", descr.importPath), func(err error, stderr string) {
+		descr.dir = runAndCheck(exec.Command(goCmd, "list", "-m", "-f", "{{.Dir}}", descr.importPath), func(err error, stderr string) {
 			logError(err.Error())
 			writeErrorLines(stderr)
 		})
@@ -137,7 +138,7 @@ func parsePluginsFile(path string) {
 }
 
 var commands = []command{
-	{cmd: "deps", name: "Dependencies",
+	{cmd: "deps", name: "Build Dependencies",
 		description: "Ensures that all dependencies required for building QuestScreen are available",
 		exec:        ensureDepsAvailable},
 	{cmd: "plugins", name: "Plugins",
@@ -219,21 +220,15 @@ func main() {
 	}
 
 	{
-		cmd := exec.Command("go", "env", "GOPATH")
-		gopath := runAndCheck(cmd, func(err error, stderr string) {
-			logError("failed to get GOPATH:")
-			logError(err.Error())
-			writeErrorLines(stderr)
-		})
-		goPathFirst := strings.SplitN(gopath, string(os.PathListSeparator), 2)[0]
-		cmd = exec.Command("go", "env", "GOBIN")
+		goCmd = filepath.Join(build.Default.GOROOT, "bin", "go")
+		cmd := exec.Command(goCmd, "env", "GOBIN")
 		goBin = runAndCheck(cmd, func(err error, stderr string) {
 			logError("failed to get GOBIN:")
 			logError(err.Error())
 			writeErrorLines(stderr)
 		})
 		if goBin == "" {
-			goBin = filepath.Join(goPathFirst, "bin")
+			goBin = filepath.Join(build.Default.GOPATH, "bin")
 		}
 	}
 
