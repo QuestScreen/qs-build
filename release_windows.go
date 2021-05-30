@@ -20,32 +20,6 @@ func findDll(name string) string {
 	return strings.TrimSpace(path)
 }
 
-func createFullscreenLink(path string) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
-	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED|ole.COINIT_SPEED_OVER_MEMORY)
-	defer ole.CoUninitialize()
-
-	oleShellObject, err := oleutil.CreateObject("WScript.Shell")
-	if err != nil {
-		return err
-	}
-	defer oleShellObject.Release()
-	wshell, err := oleShellObject.QueryInterface(ole.IID_IDispatch)
-	if err != nil {
-		return err
-	}
-	defer wshell.Release()
-	cs, err := oleutil.CallMethod(wshell, "CreateShortcut", path)
-	if err != nil {
-		return err
-	}
-	idispatch := cs.ToIDispatch()
-	oleutil.PutProperty(idispatch, "TargetPath", "questscreen.exe")
-	oleutil.CallMethod(idispatch, "Save")
-}
-
 func releaseWindowsBinary(relname string) {
 	for i := range commands {
 		logPhase(commands[i].name)
@@ -54,15 +28,17 @@ func releaseWindowsBinary(relname string) {
 	logPhase("Release")
 
 	logInfo("finding DLLs")
-	libs := [3]string{
+	libs := [9]string{
 		findDll("SDL2"),
 		findDll("SDL2_image"),
+		findDll("libjpeg-9"),
+		findDll("libpng16-16"),
+		findDll("libtiff-5"),
+		findDll("libwebp-7"),
+		findDll("zlib1"),
 		findDll("SDL2_ttf"),
+		findDll("libfreetype-6"),
 	}
-
-	logInfo("summoning OLE from the depths of hell to create fullscreen link")
-	createFullscreenLink("questscreen - fullscreen.lnk")
-	defer os.Remove("questscreen - fullscreen.lnk")
 
 	logInfo("creating " + relname + ".zip")
 	relzip, err := os.Create(relname + ".zip")
@@ -104,7 +80,6 @@ func releaseWindowsBinary(relname string) {
 	for _, lib := range libs {
 		addFiles(filepath.Dir(lib), lib)
 	}
-	addFiles(".", "questscreen.exe -f")
-	addFiles(".", "questscreen - fullscreen.lnk")
+	addFiles(".", "questscreen.exe")
 	addFiles(".", "resources")
 }
